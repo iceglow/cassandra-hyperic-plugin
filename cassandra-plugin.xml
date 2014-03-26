@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<!DOCTYPE plugin [
+	<!ENTITY process-metrics SYSTEM "/pdk/plugins/process-metrics.xml">
+]>
+<plugin package="com.bisnode.hyperic.hq.plugin.cassandra" name="cassandra">
+
+  <property name="PLUGIN_VERSION" value="0.1.0"/>
+
+	<classpath>
+		<include name="pdk/lib/mx4j"/>
+	</classpath>
+	
+	<filter name="template" value="${OBJECT_NAME}:${alias}"/>
+
+  <metrics name="Class Loading Metrics">
+    <metric name="Loaded Class Count" indicator="false" category="THROUGHPUT"/>
+    <metric name="Total Loaded Class Count" indicator="false" category="THROUGHPUT"/>
+    <metric name="Unloaded Class Count" indicator="false" category="THROUGHPUT"/>
+  </metrics>
+
+  <metrics name="Compilation">
+    <metric name="Total Compilation Time" indicator="false" category="THROUGHPUT" collectionType="trendsup" units="ms"/>
+  </metrics>
+
+  <metrics name="Garbage Collector">
+    <metric name="Collection Count" indicator="false" category="THROUGHPUT" collectionType="trendsup"/>
+    <metric name="Collection Time" indicator="false" category="THROUGHPUT" collectionType="trendsup"/>
+  </metrics>
+
+  <metrics name="Memory">
+    <metric name="Object Pending Finalization Count" category="THROUGHPUT" indicator="false"/>
+  </metrics>
+
+  <metrics name="Threading">
+    <metric name="Thread Count" category="UTILIZATION" indicator="false"/>
+    <metric name="Daemon Thread Count" category="UTILIZATION" indicator="false"/>
+  </metrics>
+
+  <metrics name="Stage">
+    <metric name="TotalBlockedTasks" indicator="false" category="THROUGHPUT" collectionType="dynamic"/>
+    <metric name="CurrentlyBlockedTasks" indicator="false" category="THROUGHPUT" collectionType="dynamic"/>
+    <metric name="CoreThreads" indicator="false" category="THROUGHPUT" collectionType="dynamic"/>
+    <metric name="MaximumThreads" indicator="false" category="THROUGHPUT" collectionType="dynamic"/>
+    <metric name="CompletedTasks" indicator="false" category="THROUGHPUT" collectionType="dynamic"/>
+    <metric name="ActiveCount" indicator="false" category="THROUGHPUT" collectionType="dynamic"/>
+    <metric name="PendingTasks" indicator="false" category="THROUGHPUT" collectionType="dynamic"/>
+  </metrics>
+
+	<server name="Cassandra" version="2.x">
+
+    <property name="HAS_BUILTIN_SERVICES" value="true"/>
+		<property name="PROC_QUERY" value="State.Name.eq=java,Args.*.ct=org.apache.cassandra.service.CassandraDaemon"/>
+    <property name="PROC_HOME_ENV" value="CASSANDRA_HOME"/>
+    <property name="domain" value="org.apache.cassandra"/>
+
+		<config>
+			<option name="jmx.url" description="JMX URL to MBeanServer" default="service:jmx:rmi:///jndi/rmi://:7199/jmxrmi"/>
+			<option name="jmx.username" description="JMX username" optional="true" default=""/>
+			<option name="jmx.password" description="JMX password" optional="true" default="" type="secret"/>
+			<option name="process.query" description="Process Query" default="State.Name.sw=java,Args.*.eq=org.apache.cassandra.service.CassandraDaemon"/>
+		</config>
+
+    <metric name="Availability" template="sigar:Type=ProcState,Arg=%process.query%:State" indicator="true"/>
+		&process-metrics;
+
+		<property name="OBJECT_NAME" value="java.lang:type=ClassLoading"/>
+		<metrics include="Class Loading Metrics"/>
+
+		<property name="OBJECT_NAME" value="java.lang:type=Compilation"/>
+		<metrics include="Compilation"/>
+
+		<property name="OBJECT_NAME" value="java.lang:type=Memory"/>
+		<metrics include="Memory"/>
+
+		<property name="OBJECT_NAME" value="java.lang:type=Threading"/>
+		<metrics include="Threading"/>
+
+    <plugin type="autoinventory" class="org.hyperic.hq.product.DaemonDetector"/>
+    <plugin type="measurement" class="org.hyperic.hq.product.jmx.MxMeasurementPlugin"/>
+
+    <service name="Java GC">
+      <plugin type="autoinventory"/>
+      <property name="OBJECT_NAME" value="java.lang:type=GarbageCollector,name=*"/>
+      <metrics include="Garbage Collector"/>
+    </service>
+
+    <service name="Cassandra GossipStage">
+      <plugin type="autoinventory"/>
+      <property name="OBJECT_NAME" value="${domain}.internal:type=GossipStage"/>
+      <metrics include="Stage"/>
+    </service>
+
+  </server>
+</plugin>
